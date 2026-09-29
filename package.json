@@ -2,6 +2,7 @@
   "name": "onebot",
   "version": "2.4.0",
   "description": "OneBot by HyperSoft - Official Multi-Guild Discord Bot & Dashboard",
+  "main": "index.js",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +10,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/multiGuild.test.mjs",
+    "test": "node tests/multiGuild.test.mjs && node tests/codeNexusEntrypoint.test.mjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -31,14 +32,15 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "typescript": "^5.9.3"
   }
 }

@@ -7,13 +7,23 @@
 
 import { Client, GatewayIntentBits, Partials, Collection, ActivityType } from 'discord.js';
 import dotenv from 'dotenv';
+import fs from 'node:fs';
+import path from 'node:path';
 import { guildDb } from './utils/guildDb.js';
 import { canExecute } from './utils/cmdGuard.js';
 import { onGuildMemberAdd } from './systems/auto_role.js';
 import globalConfig from './settings.json' with { type: 'json' };
 
-// Load environment variables
+// Load environment variables (supports standard process.cwd() and Code Nexus container path)
 dotenv.config();
+const containerEnvPath = '/home/container/.env';
+try {
+  if (fs.existsSync(containerEnvPath)) {
+    dotenv.config({ path: containerEnvPath, override: true });
+  }
+} catch (e) {
+  // Silent fallback to standard process.cwd() .env
+}
 
 // 1. Startup Environment Validation
 if (!process.env.DISCORD_TOKEN) {
