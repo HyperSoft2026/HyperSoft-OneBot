@@ -1,0 +1,21 @@
+{
+  "botName": "OneBot",
+  "developer": "HyperSoft",
+  "branding": "OneBot by HyperSoft",
+  "defaultPrefix": "!",
+  "defaultLanguage": "ar",
+  "primaryColor": "#E53935",
+  "logoPath": "/icon/Logo.png",
+  "isMultiGuild": true,
+  "clientOptions": {
+    "intents": [
+      "Guilds",
+      "GuildMembers",
+      "GuildBans",
+      "GuildMessages",
+      "MessageContent",
+      "GuildVoiceStates",
+      "GuildMessageReactions"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+name: OneBot CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-and-build:
+    name: Build, Lint & Multi-Guild Verification
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [ 20.x, 22.x ]
+
+    env:
+      DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+      DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+      DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+      PRIVACY_POLICY_URL: ${{ secrets.PRIVACY_POLICY_URL }}
+      TERMS_OF_SERVICE_URL: ${{ secrets.TERMS_OF_SERVICE_URL }}
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeCheck and Linter
+        run: npm run lint
+
+      - name: Run Multi-Guild Isolation Test Suite
+        run: npm test
+
+      - name: Build Dashboard & Web Assets
+        run: npm run build

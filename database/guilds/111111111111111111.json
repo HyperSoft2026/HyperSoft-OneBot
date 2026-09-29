@@ -1,0 +1,105 @@
+{
+  "guildId": "111111111111111111",
+  "guildName": "Alpha Server",
+  "prefix": "!",
+  "language": "ar",
+  "ticketCount": 2,
+  "protection": {
+    "antiBan": {
+      "enabled": true,
+      "limit": 3,
+      "action": "ban"
+    },
+    "antiKick": {
+      "enabled": true,
+      "limit": 3,
+      "action": "ban"
+    },
+    "antiBots": {
+      "enabled": true,
+      "action": "kick"
+    },
+    "antiChannelCreate": {
+      "enabled": true,
+      "limit": 3,
+      "action": "remove_roles"
+    },
+    "antiChannelDelete": {
+      "enabled": true,
+      "limit": 2,
+      "action": "remove_roles"
+    },
+    "antiRoleCreate": {
+      "enabled": true,
+      "limit": 3,
+      "action": "remove_roles"
+    },
+    "antiRoleDelete": {
+      "enabled": true,
+      "limit": 2,
+      "action": "remove_roles"
+    },
+    "antiWebhooks": {
+      "enabled": true,
+      "action": "delete"
+    },
+    "whitelistUsers": [],
+    "logChannelId": "",
+    "actionColor": "#E53935"
+  },
+  "moderation": {
+    "muteRoleId": "",
+    "jailRoleId": "",
+    "jailRoomId": "",
+    "courtLogChannelId": "",
+    "courtName": "محكمة السيرفر",
+    "courtLogo": "/icon/Logo.png",
+    "courtColor": "#E53935",
+    "maxWarningsBeforeAction": 3,
+    "warnAction": "mute"
+  },
+  "tickets": {
+    "enabled": true,
+    "panelChannelId": "",
+    "transcriptChannelId": "",
+    "feedbackChannelId": "",
+    "maxOpenTicketsPerUser": 1,
+    "embedColor": "#E53935",
+    "categories": [
+      {
+        "id": "support",
+        "name": "الدعم الفني",
+        "emoji": "📩",
+        "welcomeMessage": "أهلاً بك، سيتواصل معك فريق الإدارة قريباً."
+      }
+    ]
+  },
+  "roles": {
+    "autoRoleHumanId": "",
+    "autoRoleBotId": "",
+    "tempRoleAllowed": true,
+    "multipleRolePresets": []
+  },
+  "welcome": {
+    "enabled": true,
+    "welcomeChannelId": "",
+    "leaveChannelId": "",
+    "boostChannelId": "",
+    "boostRoleId": "",
+    "welcomeMessage": "أهلاً بك {user} في سيرفر {server}!",
+    "leaveMessage": "وداعاً {user}!",
+    "boostMessage": "شكراً {user} على بوست السيرفر 🚀!",
+    "sendAsEmbed": true,
+    "embedColor": "#E53935",
+    "showAvatarCard": true,
+    "cardBackgroundTheme": "dark_red"
+  },
+  "levels": {
+    "enabled": true,
+    "levelUpChannelId": "current",
+    "xpRate": 1,
+    "levelUpMessage": "مبروك {user}! لقد وصلت إلى المستوى {level} 🎉",
+    "roleRewards": []
+  },
+  "autoResponder": []
+}

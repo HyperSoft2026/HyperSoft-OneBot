@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build artifacts
+dist/
+build/
+out/
+
+# Environment files & Secrets
+.env
+.env.*
+.env.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Logs and debug files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Temporary, backup & merge conflict files
+*.bak
+*.orig
+*.tmp
+*.swp
+*.swo
+*~
+*.patch
+
+# OS and Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
+
+# Node / Framework caches
+.eslintcache
+.parcel-cache
+.vite/
+.vite-temp/
+.cache/
