@@ -20,7 +20,7 @@ export const sessionStore = new Map(); // sessionId -> { user, guilds, accessTok
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
 // Periodic cleanup of expired states and sessions
-setInterval(() => {
+const sessionCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [state, data] of oauthStateStore.entries()) {
     if (now > data.expiresAt) oauthStateStore.delete(state);
@@ -29,6 +29,9 @@ setInterval(() => {
     if (now > session.expiresAt) sessionStore.delete(sessionId);
   }
 }, 60 * 1000);
+if (sessionCleanupInterval.unref) {
+  sessionCleanupInterval.unref();
+}
 
 /**
  * Generates a cryptographically secure OAuth2 state token

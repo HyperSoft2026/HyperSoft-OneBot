@@ -676,7 +676,11 @@ const isDirectRun = process.argv[1] && (path.resolve(process.argv[1]) === path.r
 
 if (isDirectRun) {
   await initMongo();
-  if (process.env.DISCORD_TOKEN && process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV === 'test') {
+    console.log('[OneBot] Test environment bootstrap complete.');
+    process.exit(0);
+  }
+  if (process.env.DISCORD_TOKEN) {
     startDiscordBot();
   }
 }

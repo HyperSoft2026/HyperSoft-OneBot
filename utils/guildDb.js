@@ -13,6 +13,9 @@ import EventEmitter from 'events';
 import mongoose from 'mongoose';
 import { fileURLToPath } from 'url';
 
+// Prevent mongoose buffering queries when offline
+mongoose.set('bufferCommands', false);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

@@ -34,7 +34,9 @@ process.on('unhandledRejection', (reason) => {
 
 // 3. Diagnostic Startup Logging
 const HOST = '0.0.0.0';
-const PORT = 14713;
+const PORT = process.env.SERVER_PORT 
+  ? parseInt(process.env.SERVER_PORT, 10) 
+  : (process.env.PORT && process.env.PORT !== '8080' ? parseInt(process.env.PORT, 10) : 14713);
 
 console.log('[OneBot] =====================================');
 console.log('[OneBot] STARTUP');
@@ -101,15 +103,27 @@ app.get('/health', (req, res) => {
 // 6. Mount Dashboard REST API Routes
 app.use('/api', apiRouter);
 
-// 7. Serve Production Frontend Assets (Vite dist) or Dynamic Fallback
+// 7. Serve Frontend Assets (Static dist if built, Vite Dev Server Middleware in dev)
 const distPath = path.resolve(__dirname, 'dist');
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
     res.sendFile(path.join(distPath, 'index.html'));
   });
+} else if (process.env.NODE_ENV !== 'production') {
+  try {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+    console.log('[OneBot] Vite dev server middleware active');
+  } catch (viteErr) {
+    console.warn('[OneBot] Vite dev middleware unavailable:', viteErr.message);
+  }
 } else {
   app.get('/', (req, res) => {
     res.send(`
@@ -125,6 +139,18 @@ if (fs.existsSync(distPath)) {
     `);
   });
 }
+
+// Database Offline Fallback Error Handler (Graceful Handling)
+app.use((err, req, res, next) => {
+  if (err.name === 'MongooseError' || err.name === 'MongoNetworkError' || (err.message && err.message.includes('buffering timed out'))) {
+    console.warn('[OneBot] Database offline — returning fallback response');
+    if (req.method === 'GET') {
+      return res.json(req.path.endsWith('s') || req.path.endsWith('s/') ? [] : {});
+    }
+    return res.status(503).json({ error: 'Service temporarily unavailable (database offline)' });
+  }
+  next(err);
+});
 
 // Global Error Handler
 app.use((err, req, res, next) => {

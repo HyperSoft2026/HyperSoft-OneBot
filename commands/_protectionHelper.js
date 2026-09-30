@@ -14,6 +14,9 @@ export class ProtectionHelper {
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpired();
     }, 2 * 60 * 1000);
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref();
+    }
   }
 
   getCompositeKey(guildId, userId, actionType) {
