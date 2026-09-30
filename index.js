@@ -67,8 +67,15 @@ export const client = new Client({
 // Collection of loaded commands
 client.commands = new Collection();
 
+// Safe error listener to prevent unhandled EventEmitter error crashes
+client.on('error', (err) => {
+  console.error('[OneBot Discord Client Error]:', err.message);
+});
+
 // 3. Connect to Database (MongoDB if MONGODB_URI provided, otherwise local JSON fallback)
-await guildDb.connectMongo(process.env.MONGODB_URI);
+export async function initMongo(uri = process.env.MONGODB_URI) {
+  return await guildDb.connectMongo(uri);
+}
 
 // 4. Dynamic Command Loader (ESM)
 const commandsPath = path.join(__dirname, 'commands');
@@ -639,11 +646,39 @@ const handleShutdown = async (signal) => {
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
-// 11. Login to Discord Gateway (only when DISCORD_TOKEN is defined)
-if (process.env.DISCORD_TOKEN && process.env.NODE_ENV !== 'test') {
-  client.login(process.env.DISCORD_TOKEN).catch((err) => {
-    console.error("❌ [OneBot Login Error] Failed to login to Discord Gateway:", err.message);
-  });
+// 11. Discord Gateway Login Function
+export async function startDiscordBot(token = process.env.DISCORD_TOKEN) {
+  if (!token) {
+    console.log('[OneBot] Discord: OFFLINE (DISCORD_TOKEN is missing or empty)');
+    console.log('[OneBot] Dashboard remains online');
+    return false;
+  }
+  const cleanToken = String(token).trim();
+  if (!cleanToken) {
+    console.log('[OneBot] Discord: OFFLINE (DISCORD_TOKEN is empty string)');
+    console.log('[OneBot] Dashboard remains online');
+    return false;
+  }
+
+  console.log('[OneBot] Starting Discord Gateway login...');
+  try {
+    await client.login(cleanToken);
+    return true;
+  } catch (err) {
+    console.error('❌ [OneBot] Discord initialization failed:', err.message);
+    console.log('[OneBot] Dashboard remains online');
+    return false;
+  }
+}
+
+// 12. Direct execution bootstrap
+const isDirectRun = process.argv[1] && (path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url)));
+
+if (isDirectRun) {
+  await initMongo();
+  if (process.env.DISCORD_TOKEN && process.env.NODE_ENV !== 'test') {
+    startDiscordBot();
+  }
 }
 
 export default client;

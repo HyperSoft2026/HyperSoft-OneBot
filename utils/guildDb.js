@@ -43,17 +43,21 @@ export class UnifiedGuildDatabase extends EventEmitter {
    */
   async connectMongo(uri = process.env.MONGODB_URI) {
     if (!uri) {
+      console.log('[OneBot] MongoDB initialization: No MONGODB_URI provided, using local JSON database fallback.');
       return false;
     }
     if (mongoose.connection.readyState === 1) {
       return true;
     }
     try {
+      mongoose.connection.on('error', (err) => {
+        console.warn('[OneBot] MongoDB connection event error:', err.message);
+      });
       await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
-      console.log('[guildDb] Connected to MongoDB persistent store.');
+      console.log('[OneBot] MongoDB initialization: Connected to MongoDB persistent store.');
       return true;
     } catch (err) {
-      console.warn('[guildDb] MongoDB connection failed, using local database fallback:', err.message);
+      console.warn('[OneBot] MongoDB initialization: Connection failed, using local database fallback:', err.message);
       return false;
     }
   }

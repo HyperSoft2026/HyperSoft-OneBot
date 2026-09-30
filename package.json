@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node tests/multiGuild.test.mjs && node tests/codeNexusEntrypoint.test.mjs && node tests/dashboardSecurity.test.mjs",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
   "engines": {
