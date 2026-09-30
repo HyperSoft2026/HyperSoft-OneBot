@@ -27,7 +27,7 @@ export const BOT_CONFIG = {
     discordDark: "#2B2D31",
     discordEmbedBg: "#1E1F22",
   },
-  version: "2.4.0",
+  version: "1.0.0",
   releaseDate: "2026",
   get discordDefaultInvite() {
     const clientId = import.meta.env?.VITE_DISCORD_CLIENT_ID || process.env?.DISCORD_CLIENT_ID || "1234567890";

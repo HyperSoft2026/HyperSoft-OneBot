@@ -14,6 +14,7 @@ import assert from 'node:assert';
 import { guildDb } from '../utils/guildDb.js';
 import { protectionHelper } from '../commands/_protectionHelper.js';
 import { tempRoleSystem } from '../systems/temp_role.js';
+import { isDuplicateWebhookAuditLog, extractWebhookAuditChannelId, processedWebhookAuditLogs } from '../index.js';
 
 async function runTests() {
   console.log("==================================================");
@@ -157,6 +158,62 @@ async function runTests() {
   const reloaded = await guildDb.get(GUILD_A);
   assert.strictEqual(reloaded.prefix, "!", "Cache invalidation must reload fresh data immediately");
   console.log("  [PASS] Invalidation successfully reloaded fresh prefix '!' without server restart.\n");
+
+  // ----------------------------------------------------
+  // TEST 6: Temporary Role Database Persistence
+  // ----------------------------------------------------
+  console.log("👉 Test 6: Testing Temporary Role Database Persistence...");
+
+  const testExp = Date.now() + 60000;
+  await guildDb.saveTempRole(GUILD_A, TEST_USER, "role_temp_vip", testExp);
+
+  const activeTempRoles = await guildDb.getAllActiveTempRoles();
+  const savedRole = activeTempRoles.find(r => r.guildId === GUILD_A && r.userId === TEST_USER && r.roleId === "role_temp_vip");
+
+  assert.ok(savedRole, "Temporary role must be persisted to database store");
+  assert.strictEqual(savedRole.roleId, "role_temp_vip");
+  console.log("  [PASS] Temp role persisted successfully to database and retrievable on startup.\n");
+
+  await guildDb.removeTempRole(GUILD_A, TEST_USER, "role_temp_vip");
+
+  // ----------------------------------------------------
+  // TEST 7: Webhook Audit-Log Deduplication & Channel Matching
+  // ----------------------------------------------------
+  console.log("👉 Test 7: Testing Webhook Audit-Log Deduplication & Channel Matching...");
+
+  // 7.1 Deduplication on duplicate event reception
+  const logId1 = "900000000000000001";
+  const logId2 = "900000000000000002";
+  const isDupFirst = isDuplicateWebhookAuditLog(GUILD_A, logId1);
+  const isDupSecond = isDuplicateWebhookAuditLog(GUILD_A, logId1); // Immediate duplicate
+  assert.strictEqual(isDupFirst, false, "First webhook audit log must not be flagged as duplicate");
+  assert.strictEqual(isDupSecond, true, "Second identical webhook audit log must be flagged as duplicate and ignored");
+  console.log("  [PASS] 7.1 Same webhook audit-log ID received twice is counted once.");
+
+  // 7.2 Different log ID is counted independently
+  const isDupDifferent = isDuplicateWebhookAuditLog(GUILD_A, logId2);
+  assert.strictEqual(isDupDifferent, false, "Distinct webhook audit log must be processed independently");
+  console.log("  [PASS] 7.2 Different webhook audit-log IDs counted independently.");
+
+  // 7.3 Different guild isolation for deduplication
+  const isDupGuildB = isDuplicateWebhookAuditLog(GUILD_B, logId1);
+  assert.strictEqual(isDupGuildB, false, "Same audit log ID in different guild must not collide");
+  console.log("  [PASS] 7.3 Different guilds never share deduplication state.");
+
+  // 7.4 Extract channel ID from audit log
+  const mockChannelId = "555555555555555555";
+  const mockLogWithExtraChannel = { extra: { channel: { id: mockChannelId } } };
+  const mockLogWithChannelId = { extra: { channelId: mockChannelId } };
+  const mockLogWithTargetChannel = { target: { channelId: mockChannelId } };
+  assert.strictEqual(extractWebhookAuditChannelId(mockLogWithExtraChannel), mockChannelId);
+  assert.strictEqual(extractWebhookAuditChannelId(mockLogWithChannelId), mockChannelId);
+  assert.strictEqual(extractWebhookAuditChannelId(mockLogWithTargetChannel), mockChannelId);
+  console.log("  [PASS] 7.4 Correctly extracts channel information from various Discord.js v14 shapes.");
+
+  // 7.5 Missing channel metadata fails safe
+  const mockLogMissingChannel = { extra: {}, target: {} };
+  assert.strictEqual(extractWebhookAuditChannelId(mockLogMissingChannel), null, "Missing channel metadata must return null to fail safe");
+  console.log("  [PASS] 7.5 Missing channel metadata returns null and fails safe without false positive.\n");
 
   console.log("==================================================");
   console.log("✅ ALL MULTI-GUILD VERIFICATION TESTS PASSED!");

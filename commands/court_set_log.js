@@ -4,10 +4,10 @@
  * Strictly binds Court Logs to a channel inside the current Discord Guild.
  */
 
-const guildDb = require('../utils/guildDb');
-const { canExecute } = require('../utils/cmdGuard');
+import { guildDb } from '../utils/guildDb.js';
+import { canExecute } from '../utils/cmdGuard.js';
 
-module.exports = {
+export default {
   name: 'court_set_log',
   description: 'تحديد روم سجلات المحكمة لهذا السيرفر',
   userPermissions: ['Administrator'],

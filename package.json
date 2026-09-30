@@ -1,16 +1,16 @@
 {
   "name": "onebot",
-  "version": "2.4.0",
+  "version": "1.0.0",
   "description": "OneBot by HyperSoft - Official Multi-Guild Discord Bot & Dashboard",
   "main": "index.js",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "start": "node server.js",
+    "dev": "tsx server.js",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/multiGuild.test.mjs && node tests/codeNexusEntrypoint.test.mjs",
+    "test": "node tests/multiGuild.test.mjs && node tests/codeNexusEntrypoint.test.mjs && node tests/dashboardSecurity.test.mjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },

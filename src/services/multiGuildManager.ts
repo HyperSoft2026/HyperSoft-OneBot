@@ -1,27 +1,32 @@
 /**
  * OneBot by HyperSoft
- * Multi-Guild Data Isolation Engine
+ * Multi-Guild Data Isolation Engine (Authoritative REST API Client)
  * 
- * Strict Guild Separation Rule:
- * 1. Storage key is partitioned by: `onebot_guild_${guildId}`
- * 2. Every query and update requires a valid guildId.
- * 3. No shared mutable state between guilds.
+ * Strict Multi-Guild Architecture:
+ * 1. The Express Backend & Database are Authoritative.
+ * 2. User identity, guild list, bot installation, and permissions come directly from Discord API.
+ * 3. LocalStorage is restricted to non-sensitive UI convenience flags only.
  */
 
-import { GuildSettings, GuildSummary } from '../types/guild';
+import { 
+  GuildSettings, 
+  GuildSummary, 
+  DiscordUser, 
+  GuildCapabilities, 
+  GuildResources 
+} from '../types/guild';
 import { BOT_CONFIG } from '../config/botConfig';
 
-const STORAGE_PREFIX = 'onebot_guild_';
-const GUILD_INDEX_KEY = 'onebot_registered_guilds';
+const LAST_GUILD_KEY = 'onebot_last_guild_id';
 
-// Standard Default Schema for any new Guild
+// Default Schema Factory for initial/offline state
 export function createDefaultGuildSettings(guildId: string, guildName: string, icon: string | null = null): GuildSettings {
   return {
     guildId,
     guildName,
     guildIcon: icon,
     memberCount: 1,
-    ownerId: "109876543210987654",
+    ownerId: "",
     prefix: "!",
     language: "ar",
     botJoinedAt: new Date().toISOString(),
@@ -65,48 +70,15 @@ export function createDefaultGuildSettings(guildId: string, guildName: string, i
           staffRoleId: "",
           channelCategoryId: "",
           welcomeMessage: "أهلاً بك في الدعم الفني، سيتواصل معك أحد أعضاء الإدارة قريباً."
-        },
-        {
-          id: "cat_inquiry",
-          name: "الاستفسارات العامة (General Inquiries)",
-          emoji: "❓",
-          staffRoleId: "",
-          channelCategoryId: "",
-          welcomeMessage: "مرحباً بك، يرجى كتابة استفسارك وسنقوم بالرد في أسرع وقت."
         }
       ]
     },
-    autoResponder: [
-      {
-        id: "auto_rule_1",
-        trigger: "قوانين السيرفر",
-        response: "يرجى قراءة القوانين في روم الإعلانات وعدم مخالفة إرشادات السيرفر.",
-        matchType: "contains",
-        enabled: true,
-        replyInDm: false,
-        embedResponse: true
-      },
-      {
-        id: "auto_rule_2",
-        trigger: "شراء رتبة",
-        response: "يمكنك فتح تذكرة دعم فني للاستفسار عن الرتب المميزة والعروض المتاحة.",
-        matchType: "contains",
-        enabled: true,
-        replyInDm: false,
-        embedResponse: false
-      }
-    ],
+    autoResponder: [],
     roles: {
       autoRoleHumanId: "",
       autoRoleBotId: "",
       tempRoleAllowed: true,
-      multipleRolePresets: [
-        {
-          id: "preset_members",
-          name: "رتب الأعضاء الجدد",
-          roleIds: []
-        }
-      ]
+      multipleRolePresets: []
     },
     welcome: {
       enabled: true,
@@ -114,7 +86,7 @@ export function createDefaultGuildSettings(guildId: string, guildName: string, i
       leaveChannelId: "",
       boostChannelId: "",
       boostRoleId: "",
-      welcomeMessage: "أهلاً بك {user} في سيرفر {server}! نتمنى لك قضاء وقت ممتع.",
+      welcomeMessage: "أهلاً بك {user} في سيرفر {server}!",
       leaveMessage: "وداعاً {user}، نراك لاحقاً في {server}.",
       boostMessage: "شكراً {user} على دعم السيرفر عبر البوست 🚀!",
       sendAsEmbed: true,
@@ -127,28 +99,9 @@ export function createDefaultGuildSettings(guildId: string, guildName: string, i
       levelUpChannelId: "current",
       xpRate: 1.0,
       levelUpMessage: "مبروك {user}! لقد وصلت إلى المستوى {level} 🎉",
-      roleRewards: [
-        { level: 5, roleId: "" },
-        { level: 10, roleId: "" }
-      ]
+      roleRewards: []
     },
-    embeds: [
-      {
-        id: "embed_official_rules",
-        title: `قوانين سيرفر ${guildName}`,
-        description: "مرحباً بجميع الأعضاء. يرجى الالتزام بالقواعد الآتية لضمان بيئة آمنة للجميع:",
-        color: BOT_CONFIG.colors.primary,
-        authorName: "إدارة السيرفر",
-        authorIcon: BOT_CONFIG.logoUrl,
-        footerText: `OneBot by ${BOT_CONFIG.developer}`,
-        footerIcon: BOT_CONFIG.logoUrl,
-        timestamp: true,
-        fields: [
-          { name: "1. الاحترام المتبادل", value: "يمنع الشتم والإهانة بأي شكل.", inline: false },
-          { name: "2. منع الإعلانات", value: "يمنع نشر روابط السيرفرات الأخرى بدون إذن.", inline: false }
-        ]
-      }
-    ],
+    embeds: [],
     logs: {
       modLogChannelId: "",
       messageLogChannelId: "",
@@ -160,193 +113,196 @@ export function createDefaultGuildSettings(guildId: string, guildName: string, i
   };
 }
 
-// Initial registered servers for realistic multi-guild operation
-const INITIAL_SERVERS: GuildSummary[] = [
-  {
-    guildId: "123456789012345678",
-    guildName: "HyperSoft Official HQ",
-    guildIcon: null,
-    memberCount: 3420,
-    isOwner: true,
-    canManage: true,
-    botInstalled: true
-  },
-  {
-    guildId: "234567890123456789",
-    guildName: "CyberRealm Gaming Community",
-    guildIcon: null,
-    memberCount: 1850,
-    isOwner: false,
-    canManage: true,
-    botInstalled: true
-  },
-  {
-    guildId: "345678901234567890",
-    guildName: "OneBot Production Cluster",
-    guildIcon: null,
-    memberCount: 890,
-    isOwner: true,
-    canManage: true,
-    botInstalled: true
-  }
-];
-
 class MultiGuildManager {
   private memoryCache: Map<string, GuildSettings> = new Map();
+  private currentUser: DiscordUser | null = null;
+  private userGuilds: GuildSummary[] = [];
 
-  constructor() {
-    this.initRegistry();
-  }
-
-  private initRegistry(): void {
-    if (typeof window === 'undefined') return;
-
+  /**
+   * Fetches current authenticated Discord user profile from backend
+   */
+  public async fetchCurrentUser(): Promise<DiscordUser | null> {
     try {
-      const storedIndex = localStorage.getItem(GUILD_INDEX_KEY);
-      if (!storedIndex) {
-        localStorage.setItem(GUILD_INDEX_KEY, JSON.stringify(INITIAL_SERVERS));
-        // Initialize individual storage for initial guilds
-        INITIAL_SERVERS.forEach(srv => {
-          const settings = createDefaultGuildSettings(srv.guildId, srv.guildName, srv.guildIcon);
-          settings.memberCount = srv.memberCount;
-          localStorage.setItem(`${STORAGE_PREFIX}${srv.guildId}`, JSON.stringify(settings));
-        });
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          this.currentUser = data.user;
+          return data.user;
+        }
       }
-    } catch {
-      // Fallback in memory
-      INITIAL_SERVERS.forEach(srv => {
-        const settings = createDefaultGuildSettings(srv.guildId, srv.guildName, srv.guildIcon);
-        this.memoryCache.set(srv.guildId, settings);
-      });
+    } catch (err) {
+      console.warn('[MultiGuildManager] fetchCurrentUser failed:', err);
     }
-  }
-
-  public getGuildList(): GuildSummary[] {
-    try {
-      const data = localStorage.getItem(GUILD_INDEX_KEY);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch {
-      // Memory fallback
-    }
-    return INITIAL_SERVERS;
-  }
-
-  public getGuildSettings(guildId: string): GuildSettings {
-    if (!guildId) {
-      throw new Error("MultiGuildManager: guildId is required to access settings.");
-    }
-
-    // Check memory cache
-    if (this.memoryCache.has(guildId)) {
-      return JSON.parse(JSON.stringify(this.memoryCache.get(guildId)));
-    }
-
-    try {
-      const key = `${STORAGE_PREFIX}${guildId}`;
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        this.memoryCache.set(guildId, parsed);
-        return parsed;
-      }
-    } catch (e) {
-      console.warn(`Failed to read from localStorage for guild ${guildId}`, e);
-    }
-
-    // Find guild name from summary or default
-    const guildList = this.getGuildList();
-    const summary = guildList.find(g => g.guildId === guildId);
-    const newSettings = createDefaultGuildSettings(
-      guildId,
-      summary ? summary.guildName : `Server #${guildId.slice(-4)}`,
-      summary ? summary.guildIcon : null
-    );
-
-    this.saveGuildSettings(guildId, newSettings);
-    return newSettings;
-  }
-
-  public saveGuildSettings(guildId: string, updatedSettings: Partial<GuildSettings>): GuildSettings {
-    if (!guildId) {
-      throw new Error("MultiGuildManager: guildId is required to save settings.");
-    }
-
-    const current = this.getGuildSettings(guildId);
-    const merged: GuildSettings = {
-      ...current,
-      ...updatedSettings,
-      guildId, // Strictly enforce that guildId cannot be altered by payload
-      updatedAt: new Date().toISOString()
-    };
-
-    this.memoryCache.set(guildId, merged);
-
-    try {
-      localStorage.setItem(`${STORAGE_PREFIX}${guildId}`, JSON.stringify(merged));
-
-      // Update name or icon in summary list if changed
-      const list = this.getGuildList();
-      const idx = list.findIndex(g => g.guildId === guildId);
-      if (idx !== -1) {
-        if (updatedSettings.guildName) list[idx].guildName = updatedSettings.guildName;
-        if (updatedSettings.guildIcon !== undefined) list[idx].guildIcon = updatedSettings.guildIcon;
-        localStorage.setItem(GUILD_INDEX_KEY, JSON.stringify(list));
-      }
-    } catch (e) {
-      console.error(`Failed to persist guild ${guildId} to storage`, e);
-    }
-
-    return merged;
-  }
-
-  public registerNewGuild(guildId: string, guildName: string, icon: string | null = null, memberCount = 1): GuildSettings {
-    // Validate guildId (Discord snowflakes are 17-20 digits)
-    const cleanedId = guildId.trim();
-    if (!cleanedId) {
-      throw new Error("معرف السيرفر (Guild ID) غير صالح.");
-    }
-
-    const list = this.getGuildList();
-    const existing = list.find(g => g.guildId === cleanedId);
-    if (!existing) {
-      const summary: GuildSummary = {
-        guildId: cleanedId,
-        guildName: guildName.trim() || `Discord Guild ${cleanedId.slice(-4)}`,
-        guildIcon: icon,
-        memberCount: memberCount || 1,
-        isOwner: true,
-        canManage: true,
-        botInstalled: true
-      };
-      list.push(summary);
-      try {
-        localStorage.setItem(GUILD_INDEX_KEY, JSON.stringify(list));
-      } catch (err) {
-        console.warn("Could not save to localStorage", err);
-      }
-    }
-
-    const settings = createDefaultGuildSettings(cleanedId, guildName, icon);
-    return this.saveGuildSettings(cleanedId, settings);
-  }
-
-  public removeGuild(guildId: string): void {
-    try {
-      localStorage.removeItem(`${STORAGE_PREFIX}${guildId}`);
-      const list = this.getGuildList().filter(g => g.guildId !== guildId);
-      localStorage.setItem(GUILD_INDEX_KEY, JSON.stringify(list));
-      this.memoryCache.delete(guildId);
-    } catch (e) {
-      console.error(`Failed to remove guild ${guildId}`, e);
-    }
+    this.currentUser = null;
+    return null;
   }
 
   /**
-   * Diagnostic Isolation Check:
-   * Verifies that two distinct guild IDs never leak or share configuration.
+   * Fetches user's manageable Discord servers from backend
    */
+  public async fetchUserGuilds(): Promise<GuildSummary[]> {
+    try {
+      const res = await fetch('/api/guilds', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.guilds)) {
+          this.userGuilds = data.guilds;
+          return data.guilds;
+        }
+      }
+    } catch (err) {
+      console.warn('[MultiGuildManager] fetchUserGuilds failed:', err);
+    }
+    return [];
+  }
+
+  /**
+   * Fetches server capabilities & bot permissions for target guild
+   */
+  public async fetchGuildCapabilities(guildId: string): Promise<GuildCapabilities | null> {
+    if (!guildId) return null;
+    try {
+      const res = await fetch(`/api/guilds/${guildId}/capabilities`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.capabilities) {
+          return data.capabilities;
+        }
+      }
+    } catch (err) {
+      console.warn(`[MultiGuildManager] fetchGuildCapabilities failed for ${guildId}:`, err);
+    }
+    return null;
+  }
+
+  /**
+   * Fetches real Discord channels and roles belonging to target guild
+   */
+  public async fetchGuildResources(guildId: string): Promise<GuildResources | null> {
+    if (!guildId) return null;
+    try {
+      const res = await fetch(`/api/guilds/${guildId}/resources`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          return {
+            guildId: data.guildId,
+            channels: data.channels || [],
+            roles: data.roles || []
+          };
+        }
+      }
+    } catch (err) {
+      console.warn(`[MultiGuildManager] fetchGuildResources failed for ${guildId}:`, err);
+    }
+    return null;
+  }
+
+  /**
+   * Asynchronous REST API Fetcher - Retrieves authoritative settings from backend
+   */
+  public async fetchGuildSettingsAsync(guildId: string): Promise<GuildSettings> {
+    if (!guildId) throw new Error("guildId is required.");
+
+    try {
+      const res = await fetch(`/api/guilds/${guildId}/settings`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.settings) {
+          this.memoryCache.set(guildId, data.settings);
+          this.setLastActiveGuildId(guildId);
+          return data.settings;
+        }
+      } else if (res.status === 403 || res.status === 401) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "غير مصرح لك بإدارة هذا السيرفر.");
+      }
+    } catch (err: any) {
+      console.warn(`[MultiGuildManager] API Fetch failed for ${guildId}:`, err.message);
+      throw err;
+    }
+
+    // Check memory cache fallback
+    if (this.memoryCache.has(guildId)) {
+      return this.memoryCache.get(guildId)!;
+    }
+
+    const defaultSettings = createDefaultGuildSettings(guildId, `Server #${guildId.slice(-4)}`);
+    return defaultSettings;
+  }
+
+  /**
+   * Asynchronous REST API Mutator - Persists settings directly to Express Backend & MongoDB
+   */
+  public async saveGuildSettingsAsync(guildId: string, updatedSettings: Partial<GuildSettings>): Promise<GuildSettings> {
+    if (!guildId) throw new Error("guildId is required.");
+
+    const res = await fetch(`/api/guilds/${guildId}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updatedSettings)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.settings) {
+        this.memoryCache.set(guildId, data.settings);
+        return data.settings;
+      }
+    }
+
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `فشل حفظ إعدادات السيرفر (${res.status})`);
+  }
+
+  /**
+   * Logs out the user and clears sessions
+   */
+  public async logout(): Promise<void> {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
+    this.currentUser = null;
+    this.userGuilds = [];
+    this.memoryCache.clear();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(LAST_GUILD_KEY);
+    }
+  }
+
+  // Non-sensitive UI preference storage
+  public getLastActiveGuildId(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(LAST_GUILD_KEY);
+  }
+
+  public setLastActiveGuildId(guildId: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(LAST_GUILD_KEY, guildId);
+    } catch {}
+  }
+
+  public getCachedUser(): DiscordUser | null {
+    return this.currentUser;
+  }
+
+  public getCachedGuilds(): GuildSummary[] {
+    return this.userGuilds;
+  }
+
+  public getGuildSettings(guildId: string): GuildSettings {
+    if (!guildId) return createDefaultGuildSettings("0", "Default");
+    if (this.memoryCache.has(guildId)) {
+      return this.memoryCache.get(guildId)!;
+    }
+    const def = createDefaultGuildSettings(guildId, `Server #${guildId.slice(-4)}`);
+    this.memoryCache.set(guildId, def);
+    return def;
+  }
+
   public verifyMultiGuildIsolation(guildAId: string, guildBId: string): {
     isolated: boolean;
     details: string;
@@ -354,26 +310,19 @@ class MultiGuildManager {
     if (guildAId === guildBId) {
       return { isolated: false, details: "Guild IDs must be different for isolation test." };
     }
-
-    const testToken = `test_token_${Date.now()}`;
-    // Temporarily mutate guild A prefix
     const originalA = this.getGuildSettings(guildAId);
     const originalB = this.getGuildSettings(guildBId);
-
-    this.saveGuildSettings(guildAId, { prefix: testToken });
+    const testToken = `isolation_${Date.now()}`;
+    const mutatedA = { ...originalA, prefix: testToken };
+    this.memoryCache.set(guildAId, mutatedA);
     const freshB = this.getGuildSettings(guildBId);
-
-    // Verify Guild B was not touched
     const isolated = freshB.prefix === originalB.prefix && freshB.prefix !== testToken;
-
-    // Restore original A
-    this.saveGuildSettings(guildAId, { prefix: originalA.prefix });
-
+    this.memoryCache.set(guildAId, originalA);
     return {
       isolated,
       details: isolated
-        ? `Strict Multi-Guild Isolation Verified: Mutating guild [${guildAId}] did not affect guild [${guildBId}].`
-        : `Isolation Failed: Cross-contamination detected between [${guildAId}] and [${guildBId}].`
+        ? `عزل تام ومثبت: تعديل السيرفر [${guildAId}] لم يؤثر مطلقاً على بيانات السيرفر الثاني [${guildBId}].`
+        : `فشل العزل: تم رصد تداخل بين السيرفرين.`
     };
   }
 }

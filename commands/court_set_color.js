@@ -4,10 +4,10 @@
  * Strictly updates the Court Embed Color for the current Discord Guild.
  */
 
-const guildDb = require('../utils/guildDb');
-const { canExecute } = require('../utils/cmdGuard');
+import { guildDb } from '../utils/guildDb.js';
+import { canExecute } from '../utils/cmdGuard.js';
 
-module.exports = {
+export default {
   name: 'court_set_color',
   description: 'تحديد لون رسائل المحكمة لهذا السيرفر',
   userPermissions: ['Administrator'],

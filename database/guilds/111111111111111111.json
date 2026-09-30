@@ -78,7 +78,8 @@
     "autoRoleHumanId": "",
     "autoRoleBotId": "",
     "tempRoleAllowed": true,
-    "multipleRolePresets": []
+    "multipleRolePresets": [],
+    "activeTempRoles": []
   },
   "welcome": {
     "enabled": true,

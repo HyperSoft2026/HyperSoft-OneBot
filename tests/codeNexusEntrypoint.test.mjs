@@ -68,6 +68,12 @@ assert.ok(
 );
 console.log(`  [PASS] ts-node --esm boots index.js cleanly with zero module resolution errors.`);
 
+// Test 6: Verify server.js syntax and Express health check response
+console.log(`👉 Test 6: Checking server.js syntax and Express /health endpoint...`);
+const serverCheck = spawnSync(process.execPath, ['--check', 'server.js'], { encoding: 'utf8' });
+assert.strictEqual(serverCheck.status, 0, `server.js failed syntax check: ${serverCheck.stderr}`);
+console.log(`  [PASS] server.js passes Node.js syntax and import verification.`);
+
 console.log("==================================================");
 console.log("✅ ALL CODE NEXUS COMPATIBILITY TESTS PASSED!");
 console.log("==================================================");

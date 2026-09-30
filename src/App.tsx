@@ -1,13 +1,26 @@
 /**
  * OneBot by HyperSoft
  * Official Multi-Guild Management Dashboard
+ * 
+ * Production State Machine:
+ * LOADING -> UNAUTHENTICATED | SERVER_SELECT | AUTHENTICATED | FORBIDDEN | NOT_FOUND | ERROR
  */
 
 import React, { useState, useEffect } from 'react';
 import { multiGuildManager } from './services/multiGuildManager';
-import { GuildSettings, GuildSummary } from './types/guild';
+import { 
+  GuildSettings, 
+  GuildSummary, 
+  DiscordUser, 
+  GuildCapabilities, 
+  GuildResources 
+} from './types/guild';
 import { Header } from './components/Header';
 import { Sidebar, TabId } from './components/Sidebar';
+import { LoginView } from './components/auth/LoginView';
+import { ServerSelectionView } from './components/auth/ServerSelectionView';
+import { ErrorView } from './components/auth/ErrorView';
+
 import { OverviewTab } from './components/tabs/OverviewTab';
 import { ProtectionTab } from './components/tabs/ProtectionTab';
 import { ModerationTab } from './components/tabs/ModerationTab';
@@ -20,29 +33,115 @@ import { EmbedsTab } from './components/tabs/EmbedsTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
 import { IsolationInspectorTab } from './components/tabs/IsolationInspectorTab';
 import { BOT_CONFIG } from './config/botConfig';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, RotateCw } from 'lucide-react';
+
+type AuthStatus = 
+  | 'LOADING' 
+  | 'UNAUTHENTICATED' 
+  | 'SERVER_SELECT' 
+  | 'AUTHENTICATED' 
+  | 'FORBIDDEN' 
+  | 'NOT_FOUND' 
+  | 'ERROR';
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('LOADING');
+  const [user, setUser] = useState<DiscordUser | null>(null);
   const [guildList, setGuildList] = useState<GuildSummary[]>([]);
   const [activeGuildId, setActiveGuildId] = useState<string>('');
+  const [capabilities, setCapabilities] = useState<GuildCapabilities | null>(null);
+  const [resources, setResources] = useState<GuildResources | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [settings, setSettings] = useState<GuildSettings | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Load initial guild list
+  // Initial Authentication & Guild Discovery
   useEffect(() => {
-    const list = multiGuildManager.getGuildList();
-    setGuildList(list);
-    if (list.length > 0) {
-      const initialId = list[0].guildId;
-      setActiveGuildId(initialId);
-      const initialSettings = multiGuildManager.getGuildSettings(initialId);
-      setSettings(initialSettings);
-    }
+    initApp();
   }, []);
 
-  // Switch guild handler
+  const initApp = async () => {
+    setAuthStatus('LOADING');
+    try {
+      const currentUser = await multiGuildManager.fetchCurrentUser();
+      if (!currentUser) {
+        setAuthStatus('UNAUTHENTICATED');
+        return;
+      }
+
+      setUser(currentUser);
+      await loadUserGuilds(currentUser);
+    } catch (err: any) {
+      console.error('[App Init Error]:', err);
+      setAuthStatus('UNAUTHENTICATED');
+    }
+  };
+
+  const loadUserGuilds = async (currentUser: DiscordUser) => {
+    setIsRefreshing(true);
+    try {
+      const guilds = await multiGuildManager.fetchUserGuilds();
+      setGuildList(guilds);
+
+      const activeGuilds = guilds.filter(g => g.botInstalled && g.canManage);
+
+      if (activeGuilds.length === 0) {
+        // User is logged in, but has no guilds with OneBot installed yet
+        setAuthStatus('SERVER_SELECT');
+        setIsRefreshing(false);
+        return;
+      }
+
+      // Restore last active guild or select the first available active guild
+      const savedLastId = multiGuildManager.getLastActiveGuildId();
+      const targetGuildId = activeGuilds.find(g => g.guildId === savedLastId)?.guildId || activeGuilds[0].guildId;
+
+      await selectAndLoadGuild(targetGuildId);
+    } catch (err: any) {
+      console.error('[loadUserGuilds Error]:', err);
+      setErrorMessage(err.message || 'حدث خطأ أثناء تحميل السيرفرات.');
+      setAuthStatus('ERROR');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const selectAndLoadGuild = async (guildId: string) => {
+    if (!guildId) return;
+    setAuthStatus('LOADING');
+    try {
+      setActiveGuildId(guildId);
+
+      // Fetch capabilities, resources, and settings in parallel
+      const [caps, res, guildSettings] = await Promise.all([
+        multiGuildManager.fetchGuildCapabilities(guildId),
+        multiGuildManager.fetchGuildResources(guildId),
+        multiGuildManager.fetchGuildSettingsAsync(guildId)
+      ]);
+
+      setCapabilities(caps);
+      setResources(res);
+      setSettings(guildSettings);
+      setHasUnsavedChanges(false);
+      setAuthStatus('AUTHENTICATED');
+    } catch (err: any) {
+      console.error(`[selectAndLoadGuild Error for ${guildId}]:`, err.message);
+      if (err.message && err.message.includes('رفض الوصول')) {
+        setErrorMessage(err.message);
+        setAuthStatus('FORBIDDEN');
+      } else if (err.message && err.message.includes('OneBot ليس عضواً')) {
+        setErrorMessage(err.message);
+        setAuthStatus('NOT_FOUND');
+      } else {
+        setErrorMessage(err.message || 'فشل جلب بيانات السيرفر.');
+        setAuthStatus('ERROR');
+      }
+    }
+  };
+
   const handleSelectGuild = (newGuildId: string) => {
     if (newGuildId === activeGuildId) return;
 
@@ -53,30 +152,9 @@ export default function App() {
       }
     }
 
-    setActiveGuildId(newGuildId);
-    const newSettings = multiGuildManager.getGuildSettings(newGuildId);
-    setSettings(newSettings);
-    setHasUnsavedChanges(false);
-
-    showToast(`تم التبديل إلى سيرفر "${newSettings.guildName}" (ID: ${newGuildId})`);
+    selectAndLoadGuild(newGuildId);
   };
 
-  // Add new guild handler
-  const handleAddNewGuild = (guildId: string, guildName: string) => {
-    try {
-      const newSettings = multiGuildManager.registerNewGuild(guildId, guildName);
-      const updatedList = multiGuildManager.getGuildList();
-      setGuildList(updatedList);
-      setActiveGuildId(guildId);
-      setSettings(newSettings);
-      setHasUnsavedChanges(false);
-      showToast(`تمت إضافة وربط سيرفر "${guildName}" بنجاح!`);
-    } catch (e: any) {
-      alert(e.message || "فشلت إضافة السيرفر");
-    }
-  };
-
-  // Update current settings in memory
   const handleUpdateSettings = (partial: Partial<GuildSettings>) => {
     if (!settings) return;
     setSettings({
@@ -86,18 +164,25 @@ export default function App() {
     setHasUnsavedChanges(true);
   };
 
-  // Save changes to persistent storage
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     if (!settings || !activeGuildId) return;
 
-    const saved = multiGuildManager.saveGuildSettings(activeGuildId, settings);
-    setSettings(saved);
-    setHasUnsavedChanges(false);
-    
-    // Refresh guild list in case name changed
-    setGuildList(multiGuildManager.getGuildList());
+    try {
+      const saved = await multiGuildManager.saveGuildSettingsAsync(activeGuildId, settings);
+      setSettings(saved);
+      setHasUnsavedChanges(false);
+      showToast(`تم حفظ جميع إعدادات سيرفر "${saved.guildName}" بنجاح!`);
+    } catch (err: any) {
+      alert(`فشل الحفظ: ${err.message || 'حدث خطأ في الاتصال بالسيرفر'}`);
+    }
+  };
 
-    showToast(`تم حفظ جميع إعدادات سيرفر "${saved.guildName}" بنجاح!`);
+  const handleLogout = async () => {
+    await multiGuildManager.logout();
+    setUser(null);
+    setGuildList([]);
+    setSettings(null);
+    setAuthStatus('UNAUTHENTICATED');
   };
 
   const showToast = (msg: string) => {
@@ -107,23 +192,81 @@ export default function App() {
     }, 3500);
   };
 
-  const currentSummary = guildList.find(g => g.guildId === activeGuildId);
-
-  if (!settings) {
+  // 1. Loading View
+  if (authStatus === 'LOADING') {
     return (
       <div className="min-h-screen bg-[#0A0A0C] flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-[#E53935]/20 border border-[#E53935] p-2 flex items-center justify-center animate-pulse">
             <img src={BOT_CONFIG.logoUrl} alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <span className="text-xs text-gray-400 font-mono">جاري تحميل بيانات السيرفرات...</span>
+          <span className="text-xs text-gray-400 font-mono flex items-center gap-2">
+            <RotateCw className="w-3.5 h-3.5 animate-spin text-[#E53935]" />
+            جاري التحقق من هوية ديسكورد والمصادقة...
+          </span>
         </div>
       </div>
     );
   }
 
+  // 2. Unauthenticated Login Gate
+  if (authStatus === 'UNAUTHENTICATED') {
+    return <LoginView />;
+  }
+
+  // 3. Server Selection View ("My Servers" & "Add OneBot")
+  if (authStatus === 'SERVER_SELECT' && user) {
+    return (
+      <ServerSelectionView
+        user={user}
+        guilds={guildList}
+        onSelectGuild={(id) => selectAndLoadGuild(id)}
+        onRefreshGuilds={() => loadUserGuilds(user)}
+        onLogout={handleLogout}
+        isRefreshing={isRefreshing}
+      />
+    );
+  }
+
+  // 4. Forbidden View (403)
+  if (authStatus === 'FORBIDDEN') {
+    return (
+      <ErrorView 
+        code={403} 
+        message={errorMessage} 
+        onBackToServers={() => setAuthStatus('SERVER_SELECT')} 
+      />
+    );
+  }
+
+  // 5. Not Found View (404)
+  if (authStatus === 'NOT_FOUND') {
+    return (
+      <ErrorView 
+        code={404} 
+        message={errorMessage} 
+        onBackToServers={() => setAuthStatus('SERVER_SELECT')} 
+      />
+    );
+  }
+
+  // 6. Generic Error View (500)
+  if (authStatus === 'ERROR') {
+    return (
+      <ErrorView 
+        code={500} 
+        message={errorMessage} 
+        onRetry={initApp} 
+        onBackToServers={() => setAuthStatus('SERVER_SELECT')} 
+      />
+    );
+  }
+
+  const currentSummary = guildList.find(g => g.guildId === activeGuildId);
+
+  // 7. Authenticated Dashboard View
   return (
-    <div className="min-h-screen bg-[#0A0A0C] text-[#F3F4F6] flex flex-col selection:bg-[#E53935] selection:text-white">
+    <div className="min-h-screen bg-[#0A0A0C] text-[#F3F4F6] flex flex-col selection:bg-[#E53935] selection:text-white pb-16 lg:pb-0">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 left-6 z-50 bg-[#16161D] border border-emerald-500/40 text-emerald-300 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
@@ -136,8 +279,10 @@ export default function App() {
       <Header
         currentGuildSummary={currentSummary}
         guildList={guildList}
+        user={user}
         onSelectGuild={handleSelectGuild}
-        onAddNewGuild={handleAddNewGuild}
+        onOpenServerSelector={() => setAuthStatus('SERVER_SELECT')}
+        onLogout={handleLogout}
         hasUnsavedChanges={hasUnsavedChanges}
         onSaveCurrentSettings={handleSaveSettings}
       />
@@ -147,85 +292,86 @@ export default function App() {
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
-          guildName={settings.guildName}
+          onTabChange={(tab) => setActiveTab(tab)}
+          guildName={settings?.guildName || "Discord Guild"}
+          capabilities={capabilities}
         />
 
-        {/* Tab Content */}
+        {/* Content Tabs */}
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && settings && (
             <OverviewTab
               settings={settings}
               onUpdate={handleUpdateSettings}
-              onSwitchTab={setActiveTab}
+              onSwitchTab={(t) => setActiveTab(t)}
             />
           )}
 
-          {activeTab === 'protection' && (
+          {activeTab === 'protection' && settings && (
             <ProtectionTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'moderation' && (
+          {activeTab === 'moderation' && settings && (
             <ModerationTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'tickets' && (
+          {activeTab === 'tickets' && settings && (
             <TicketsTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'autoresponder' && (
+          {activeTab === 'autoresponder' && settings && (
             <AutoResponderTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'roles' && (
+          {activeTab === 'roles' && settings && (
             <RolesTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'welcome' && (
+          {activeTab === 'welcome' && settings && (
             <WelcomeTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'levels' && (
+          {activeTab === 'levels' && settings && (
             <LevelsTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'embeds' && (
+          {activeTab === 'embeds' && settings && (
             <EmbedsTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && settings && (
             <SettingsTab
               settings={settings}
               onUpdate={handleUpdateSettings}
             />
           )}
 
-          {activeTab === 'inspector' && (
-            <IsolationInspectorTab
+          {activeTab === 'inspector' && settings && (
+            <IsolationInspectorTab 
               currentSettings={settings}
               guildList={guildList}
             />

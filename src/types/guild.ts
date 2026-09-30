@@ -138,6 +138,66 @@ export interface GuildSettings {
   logs: GuildLogSettings;
 }
 
+export interface DiscordUser {
+  id: string;
+  username: string;
+  discriminator: string;
+  global_name: string | null;
+  avatar: string | null;
+}
+
+export interface GuildPermissionsMap {
+  administrator: boolean;
+  manageGuild: boolean;
+  manageChannels: boolean;
+  manageRoles: boolean;
+  manageMessages: boolean;
+  moderateMembers: boolean;
+  banMembers: boolean;
+  kickMembers: boolean;
+}
+
+export interface GuildFeaturesMap {
+  dashboard: boolean;
+  moderation: boolean;
+  protection: boolean;
+  tickets: boolean;
+  autoRole: boolean;
+  welcome: boolean;
+  logs: boolean;
+  commands: boolean;
+}
+
+export interface GuildCapabilities {
+  guildId: string;
+  isOwner: boolean;
+  botInstalled: boolean;
+  userPermissions: GuildPermissionsMap;
+  botPermissions: GuildPermissionsMap;
+  features: GuildFeaturesMap;
+}
+
+export interface GuildChannelSummary {
+  id: string;
+  name: string;
+  type: number; // 0 = text, 2 = voice, 4 = category, etc.
+  parentId: string | null;
+}
+
+export interface GuildRoleSummary {
+  id: string;
+  name: string;
+  position: number;
+  color: string;
+  managed: boolean;
+}
+
+export interface GuildResources {
+  guildId: string;
+  channels: GuildChannelSummary[];
+  roles: GuildRoleSummary[];
+}
+
 export interface GuildSummary {
   guildId: string;
   guildName: string;
@@ -146,4 +206,5 @@ export interface GuildSummary {
   isOwner: boolean;
   canManage: boolean;
   botInstalled: boolean;
+  permissions?: string;
 }

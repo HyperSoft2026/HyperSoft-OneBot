@@ -136,6 +136,13 @@ const GuildSchema = new mongoose.Schema({
         name: { type: String, required: true },
         roleIds: { type: [String], default: [] }
       }
+    ],
+    activeTempRoles: [
+      {
+        userId: { type: String, required: true },
+        roleId: { type: String, required: true },
+        expiresAt: { type: Date, required: true }
+      }
     ]
   },
   welcome: {

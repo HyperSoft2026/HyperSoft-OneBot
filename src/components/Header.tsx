@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
 import { BOT_CONFIG } from '../config/botConfig';
-import { GuildSummary } from '../types/guild';
+import { GuildSummary, DiscordUser } from '../types/guild';
 import { 
   ChevronDown, 
-  Plus, 
   ShieldCheck, 
   Check, 
   Layers, 
-  Globe, 
-  Server
+  Server,
+  LogOut,
+  ExternalLink,
+  Plus
 } from 'lucide-react';
 
 interface HeaderProps {
   currentGuildSummary: GuildSummary | undefined;
   guildList: GuildSummary[];
+  user: DiscordUser | null;
   onSelectGuild: (guildId: string) => void;
-  onAddNewGuild: (guildId: string, guildName: string) => void;
+  onOpenServerSelector: () => void;
+  onLogout: () => void;
   hasUnsavedChanges: boolean;
   onSaveCurrentSettings: () => void;
 }
@@ -23,35 +26,20 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentGuildSummary,
   guildList,
+  user,
   onSelectGuild,
-  onAddNewGuild,
+  onOpenServerSelector,
+  onLogout,
   hasUnsavedChanges,
   onSaveCurrentSettings
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newGuildId, setNewGuildId] = useState('');
-  const [newGuildName, setNewGuildName] = useState('');
-  const [addError, setAddError] = useState('');
 
-  const handleAddSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGuildId.trim()) {
-      setAddError('يرجى إدخال معرف السيرفر (Guild ID)');
-      return;
-    }
-    if (!/^\d{16,20}$/.test(newGuildId.trim())) {
-      setAddError('معرف السيرفر يجب أن يتكون من 16 إلى 20 رقماً (Discord Snowflake)');
-      return;
-    }
+  const activeGuilds = guildList.filter(g => g.botInstalled && g.canManage);
 
-    onAddNewGuild(newGuildId.trim(), newGuildName.trim() || `سيرفر ${newGuildId.slice(-4)}`);
-    setNewGuildId('');
-    setNewGuildName('');
-    setAddError('');
-    setIsAddModalOpen(false);
-    setDropdownOpen(false);
-  };
+  const userAvatar = user?.avatar
+    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
+    : `https://cdn.discordapp.com/embed/avatars/${parseInt(user?.discriminator || '0', 10) % 5}.png`;
 
   return (
     <header className="sticky top-0 z-40 bg-[#0F0F12]/95 backdrop-blur-md border-b border-[#22222B] px-4 lg:px-8 py-3.5 transition-colors">
@@ -59,14 +47,13 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Brand identity: OneBot by HyperSoft */}
         <div className="flex items-center gap-3.5">
-          <div className="relative group">
+          <div className="relative group cursor-pointer" onClick={onOpenServerSelector}>
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#E53935] to-[#800F11] p-[2px] shadow-lg shadow-[#E53935]/25 transition-transform group-hover:scale-105">
               <img 
                 src={BOT_CONFIG.logoUrl} 
                 alt="OneBot Logo" 
                 className="w-full h-full object-cover rounded-[10px] bg-black"
                 onError={(e) => {
-                  // Fallback in case of image load failure
                   (e.target as HTMLImageElement).src = '/icon/Logo.png';
                 }}
               />
@@ -76,11 +63,11 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight text-white flex items-center gap-1.5">
+              <span className="font-extrabold text-xl tracking-tight text-white flex items-center gap-1.5 cursor-pointer" onClick={onOpenServerSelector}>
                 {BOT_CONFIG.name}
               </span>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#E53935]/15 text-[#E53935] border border-[#E53935]/30">
-                Multi-Guild
+                Dashboard
               </span>
             </div>
             <div className="text-xs text-gray-400 font-medium flex items-center gap-1">
@@ -92,15 +79,17 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Multi-Guild Switcher Dropdown */}
+        {/* Center / Right Controls */}
         <div className="flex items-center gap-3">
+          
+          {/* Server Switcher Dropdown */}
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-3 bg-[#18181E] hover:bg-[#202028] border border-[#2A2A35] hover:border-[#E53935]/50 px-3.5 py-2 rounded-xl text-right transition-all group shadow-sm"
+              className="flex items-center gap-3 bg-[#18181E] hover:bg-[#202028] border border-[#2A2A35] hover:border-[#E53935]/50 px-3.5 py-2 rounded-xl text-right transition-all group shadow-sm cursor-pointer"
               aria-label="اختيار السيرفر"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#272732] flex items-center justify-center font-bold text-sm text-[#E53935] border border-[#353545] overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-[#272732] flex items-center justify-center font-bold text-sm text-[#E53935] border border-[#353545] overflow-hidden shrink-0">
                 {currentGuildSummary?.guildIcon ? (
                   <img src={currentGuildSummary.guildIcon} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -109,8 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="hidden sm:block text-right">
-                <div className="text-xs text-gray-400 font-medium">السيرفر الحالي</div>
-                <div className="text-sm font-bold text-white max-w-[140px] md:max-w-[200px] truncate">
+                <div className="text-[10px] text-gray-400 font-medium">السيرفر المحدد</div>
+                <div className="text-xs font-bold text-white max-w-[130px] md:max-w-[180px] truncate">
                   {currentGuildSummary?.guildName || "اختر سيرفراً"}
                 </div>
               </div>
@@ -124,63 +113,90 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="px-3.5 py-2 border-b border-[#252532] flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-[#E53935]" />
-                    سيرفراتك ({guildList.length})
+                    السيرفرات المفعلة ({activeGuilds.length})
                   </span>
-                  <span className="text-[10px] text-gray-500 bg-[#20202B] px-2 py-0.5 rounded-full">
-                    بيانات معزولة
-                  </span>
+                  <button 
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onOpenServerSelector();
+                    }}
+                    className="text-[10px] text-[#E53935] hover:underline font-bold"
+                  >
+                    عرض الكل
+                  </button>
                 </div>
 
                 <div className="max-h-60 overflow-y-auto py-1 divide-y divide-[#20202B]/40">
-                  {guildList.map((guild) => {
-                    const isSelected = guild.guildId === currentGuildSummary?.guildId;
-                    return (
-                      <button
-                        key={guild.guildId}
-                        onClick={() => {
-                          onSelectGuild(guild.guildId);
-                          setDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 hover:bg-[#1E1E26] transition-colors text-right ${
-                          isSelected ? 'bg-[#E53935]/10 border-r-4 border-[#E53935]' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
-                            isSelected ? 'bg-[#E53935] text-white' : 'bg-[#252533] text-gray-300'
-                          }`}>
-                            {guild.guildName.slice(0, 1)}
-                          </div>
-                          <div className="truncate">
-                            <div className={`text-xs font-bold truncate ${isSelected ? 'text-[#E53935]' : 'text-gray-200'}`}>
-                              {guild.guildName}
+                  {activeGuilds.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-gray-400">
+                      لا توجد سيرفرات مضافة حالياً.
+                    </div>
+                  ) : (
+                    activeGuilds.map((guild) => {
+                      const isSelected = guild.guildId === currentGuildSummary?.guildId;
+                      return (
+                        <button
+                          key={guild.guildId}
+                          onClick={() => {
+                            onSelectGuild(guild.guildId);
+                            setDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 hover:bg-[#1E1E26] transition-colors text-right cursor-pointer ${
+                            isSelected ? 'bg-[#E53935]/10 border-r-4 border-[#E53935]' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 overflow-hidden">
+                            {guild.guildIcon ? (
+                              <img src={guild.guildIcon} alt="" className="w-7 h-7 rounded-lg object-cover border border-[#2F2F3D] shrink-0" />
+                            ) : (
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                                isSelected ? 'bg-[#E53935] text-white' : 'bg-[#252533] text-gray-300'
+                              }`}>
+                                {guild.guildName.slice(0, 1)}
+                              </div>
+                            )}
+                            <div className="truncate">
+                              <div className={`text-xs font-bold truncate ${isSelected ? 'text-[#E53935]' : 'text-gray-200'}`}>
+                                {guild.guildName}
+                              </div>
+                              <div className="text-[10px] text-gray-400 font-mono">
+                                ID: {guild.guildId.slice(0, 8)}...
+                              </div>
                             </div>
-                            <div className="text-[10px] text-gray-400 font-mono">
-                              ID: {guild.guildId.slice(0, 8)}...
-                            </div>
                           </div>
-                        </div>
 
-                        {isSelected && (
-                          <Check className="w-4 h-4 text-[#E53935] shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-[#E53935] shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
-                {/* Add new Server action */}
-                <div className="p-2 border-t border-[#252532] mt-1">
+                {/* All Servers and Add Bot actions */}
+                <div className="p-2 border-t border-[#252532] mt-1 space-y-1">
                   <button
                     onClick={() => {
-                      setIsAddModalOpen(true);
                       setDropdownOpen(false);
+                      onOpenServerSelector();
                     }}
-                    className="w-full flex items-center justify-center gap-2 bg-[#22222C] hover:bg-[#E53935]/15 hover:text-[#E53935] text-gray-300 hover:border-[#E53935]/40 border border-transparent py-2 rounded-xl text-xs font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 bg-[#22222C] hover:bg-[#2C2C3A] text-gray-300 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-gray-400" />
+                    <span>إدارة جميع السيرفرات (My Servers)</span>
+                  </button>
+
+                  <a
+                    href="https://discord.com/oauth2/authorize?client_id=1542313642060419213&permissions=8&scope=bot%20applications.commands"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 bg-[#E53935]/10 hover:bg-[#E53935]/20 text-[#E53935] py-2 rounded-xl text-xs font-semibold transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    ربط سيرفر ديسكورد جديد (Guild ID)
-                  </button>
+                    <span>إضافة OneBot لسيرفر آخر</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
             )}
@@ -190,97 +206,39 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onSaveCurrentSettings}
             disabled={!hasUnsavedChanges}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
               hasUnsavedChanges 
                 ? 'bg-[#E53935] hover:bg-[#D32F2F] text-white shadow-[#E53935]/30 cursor-pointer animate-pulse'
                 : 'bg-[#202028] text-gray-400 border border-[#2B2B38] cursor-default'
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>{hasUnsavedChanges ? 'حفظ التغييرات' : 'الإعدادات محفوظة'}</span>
+            <span className="hidden sm:inline">{hasUnsavedChanges ? 'حفظ التغييرات' : 'الإعدادات محفوظة'}</span>
           </button>
-        </div>
 
-      </div>
-
-      {/* Add Guild Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#141419] border border-[#2A2A38] rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-[#252533]">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#E53935]/15 flex items-center justify-center text-[#E53935]">
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-base">إضافة سيرفر ديسكورد جديد</h3>
-                  <p className="text-xs text-gray-400">عزل تام لإعدادات السيرفر عبر الـ Guild ID</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#20202A]"
+          {/* Authenticated User Profile */}
+          {user && (
+            <div className="flex items-center gap-2.5 bg-[#181820] border border-[#272733] px-3 py-1.5 rounded-xl">
+              <img 
+                src={userAvatar} 
+                alt={user.username} 
+                className="w-7 h-7 rounded-full object-cover border border-[#3A3A4A]" 
+              />
+              <span className="text-xs font-bold text-white hidden md:block max-w-[100px] truncate">
+                {user.global_name || user.username}
+              </span>
+              <button
+                onClick={onLogout}
+                className="text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-lg transition-colors cursor-pointer"
+                title="تسجيل الخروج"
               >
-                ✕
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
+          )}
 
-            <form onSubmit={handleAddSubmit} className="mt-4 space-y-4">
-              {addError && (
-                <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-xs text-red-300">
-                  {addError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                  معرف السيرفر (Discord Guild ID) <span className="text-[#E53935]">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: 123456789012345678"
-                  value={newGuildId}
-                  onChange={(e) => setNewGuildId(e.target.value)}
-                  className="w-full bg-[#1B1B22] border border-[#2C2C3A] focus:border-[#E53935] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-colors"
-                  required
-                />
-                <p className="text-[11px] text-gray-500 mt-1">
-                  يمكنك الحصول عليه عبر النقر بالزر الأيمن على السيرفر في ديسكورد ثم "نسخ المعرّف" (Copy ID).
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                  اسم السيرفر (اختياري)
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: سيرفر مجتمع اللاعبين"
-                  value={newGuildName}
-                  onChange={(e) => setNewGuildName(e.target.value)}
-                  className="w-full bg-[#1B1B22] border border-[#2C2C3A] focus:border-[#E53935] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-colors"
-                />
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 bg-[#E53935] hover:bg-[#D32F2F] text-white py-2.5 rounded-xl font-bold text-xs transition-colors shadow-lg shadow-[#E53935]/25"
-                >
-                  تأكيد وإضافة السيرفر
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 bg-[#20202A] hover:bg-[#282835] text-gray-300 rounded-xl font-bold text-xs transition-colors"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
-      )}
+      </div>
     </header>
   );
 };

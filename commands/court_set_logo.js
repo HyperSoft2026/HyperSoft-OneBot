@@ -4,10 +4,10 @@
  * Updates Court Logo for the current Guild.
  */
 
-const guildDb = require('../utils/guildDb');
-const { canExecute } = require('../utils/cmdGuard');
+import { guildDb } from '../utils/guildDb.js';
+import { canExecute } from '../utils/cmdGuard.js';
 
-module.exports = {
+export default {
   name: 'court_set_logo',
   description: 'تحديد شعار المحكمة لهذا السيرفر',
   userPermissions: ['Administrator'],

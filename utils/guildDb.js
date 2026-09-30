@@ -314,6 +314,102 @@ export class UnifiedGuildDatabase extends EventEmitter {
   }
 
   /**
+   * Save temporary role persistence to MongoDB & JSON backup
+   */
+  async saveTempRole(guildId, userId, roleId, expiresAt) {
+    const safeGuildId = String(guildId).trim();
+    const settings = await this.get(safeGuildId);
+    const rolesConfig = settings.roles || {};
+    const existingTemp = rolesConfig.activeTempRoles || [];
+
+    const updatedTemp = existingTemp.filter(
+      r => !(r.userId === userId && r.roleId === roleId)
+    );
+    updatedTemp.push({ userId, roleId, expiresAt: new Date(expiresAt).toISOString() });
+
+    await this.set(safeGuildId, {
+      roles: {
+        ...rolesConfig,
+        activeTempRoles: updatedTemp
+      }
+    });
+  }
+
+  /**
+   * Remove temporary role persistence from DB
+   */
+  async removeTempRole(guildId, userId, roleId) {
+    const safeGuildId = String(guildId).trim();
+    const settings = await this.get(safeGuildId);
+    const rolesConfig = settings.roles || {};
+    const existingTemp = rolesConfig.activeTempRoles || [];
+
+    const updatedTemp = existingTemp.filter(
+      r => !(r.userId === userId && r.roleId === roleId)
+    );
+
+    await this.set(safeGuildId, {
+      roles: {
+        ...rolesConfig,
+        activeTempRoles: updatedTemp
+      }
+    });
+  }
+
+  /**
+   * Retrieve all active temporary roles across all guilds for startup restoration
+   */
+  async getAllActiveTempRoles() {
+    const active = [];
+    if (mongoose.connection.readyState === 1 && GuildModel) {
+      try {
+        const docs = await GuildModel.find({ "roles.activeTempRoles.0": { $exists: true } }).lean();
+        for (const doc of docs) {
+          if (doc.roles?.activeTempRoles) {
+            for (const item of doc.roles.activeTempRoles) {
+              active.push({
+                guildId: doc.guildId,
+                userId: item.userId,
+                roleId: item.roleId,
+                expiresAt: new Date(item.expiresAt).getTime()
+              });
+            }
+          }
+        }
+        return active;
+      } catch (err) {
+        console.warn("[guildDb] Failed to fetch activeTempRoles from Mongo:", err.message);
+      }
+    }
+
+    // JSON directory fallback
+    try {
+      if (fs.existsSync(JSON_DIR)) {
+        const files = fs.readdirSync(JSON_DIR);
+        for (const file of files) {
+          if (file.endsWith('.json')) {
+            const raw = fs.readFileSync(path.join(JSON_DIR, file), 'utf8');
+            const data = JSON.parse(raw);
+            if (data.roles?.activeTempRoles) {
+              for (const item of data.roles.activeTempRoles) {
+                active.push({
+                  guildId: data.guildId,
+                  userId: item.userId,
+                  roleId: item.roleId,
+                  expiresAt: new Date(item.expiresAt).getTime()
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+    return active;
+  }
+
+  /**
    * Invalidate in-memory cache for a guild
    */
   invalidate(guildId) {
