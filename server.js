@@ -10,14 +10,19 @@
  * 5. Initialize MongoDB connection (isolated, non-blocking)
  */
 
-// 1. Load environment before all else
-import './src/loadEnv.js';
+// 1. Self-healing dependency verification via bootstrap (guarantees node_modules is intact)
+import { ensureDependenciesReady } from './scripts/bootstrap.mjs';
+await ensureDependenciesReady();
 
-import express from 'express';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import apiRouter from './dashboard/routes/api.js';
+// 2. Load environment before all else
+await import('./src/loadEnv.js');
+
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const { default: express } = await import('express');
+const { default: apiRouter } = await import('./dashboard/routes/api.js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

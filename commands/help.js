@@ -52,7 +52,7 @@ function buildHelpEmbed(client, specificCmdName, guildName = 'OneBot Server') {
         { name: 'الصلاحيات المطلوبة', value: perms, inline: true },
         { name: 'الاستخدام', value: `\`/${cmd.name}\` أو \`!${cmd.name}\``, inline: false }
       )
-      .setFooter({ text: `OneBot by HyperSoft • ${guildName}`, iconURL: '/icon/Logo.png' })
+      .setFooter({ text: `OneBot by HyperSoft • ${guildName}`, iconURL: 'http://51.83.6.7:20360/icon/Logo.png' })
       .setTimestamp();
   }
 
@@ -85,8 +85,8 @@ function buildHelpEmbed(client, specificCmdName, guildName = 'OneBot Server') {
       `للحصول على تفاصيل أي أمر: \`/help command:<اسم_الأمر>\``
     )
     .setColor('#E53935')
-    .setThumbnail('/icon/Logo.png')
-    .setFooter({ text: 'OneBot by HyperSoft • لوحة التحكم: http://51.83.6.7:20360', iconURL: '/icon/Logo.png' })
+    .setThumbnail('http://51.83.6.7:20360/icon/Logo.png')
+    .setFooter({ text: 'OneBot by HyperSoft • لوحة التحكم: http://51.83.6.7:20360', iconURL: 'http://51.83.6.7:20360/icon/Logo.png' })
     .setTimestamp();
 
   // Sort categories by predefined order
