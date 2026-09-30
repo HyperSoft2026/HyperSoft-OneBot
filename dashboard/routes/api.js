@@ -73,9 +73,10 @@ router.get('/auth/login', (req, res) => {
   }
 
   const state = generateOAuthState();
+  const isHttps = Boolean(req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.COOKIE_SECURE === 'true');
   res.cookie('onebot_oauth_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isHttps,
     sameSite: 'lax',
     maxAge: 10 * 60 * 1000,
     path: '/'
@@ -123,10 +124,11 @@ router.get('/auth/callback', async (req, res) => {
     const { userData, guildsData, accessToken } = await exchangeOAuthCode(code);
     const sessionId = createSession(userData, guildsData, accessToken);
 
-    // Set secure HttpOnly session cookie
+    // Set secure HttpOnly session cookie (dynamically adapts to HTTP vs HTTPS)
+    const isHttps = Boolean(req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.COOKIE_SECURE === 'true');
     res.cookie('onebot_session', sessionId, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'

@@ -10,6 +10,7 @@ import { canExecute } from '../utils/cmdGuard.js';
 export default {
   name: 'temprole',
   description: 'إعطاء رتبة مؤقتة لعضو لفترة زمنية محددة',
+  category: 'Administration',
   userPermissions: ['ManageRoles'],
   botPermissions: ['ManageRoles'],
   data: new SlashCommandBuilder()

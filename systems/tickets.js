@@ -3,7 +3,7 @@
  * System: tickets (ES Module)
  */
 
-import { EmbedBuilder, ChannelType, PermissionsBitField } from 'discord.js';
+import { EmbedBuilder, ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { guildDb } from '../utils/guildDb.js';
 
 export async function createTicket(guild, user, categoryId = 'support') {
@@ -102,7 +102,15 @@ export async function createTicket(guild, user, categoryId = 'support') {
     .setFooter({ text: `OneBot by HyperSoft • ${guild.name}`, iconURL: "/icon/Logo.png" })
     .setTimestamp();
 
-  await channel.send({ content: `<@${user.id}>`, embeds: [embed] });
+  const closeRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`ticket_close:${user.id}`)
+      .setLabel('إغلاق التذكرة')
+      .setEmoji('🔒')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
 
   return {
     success: true,

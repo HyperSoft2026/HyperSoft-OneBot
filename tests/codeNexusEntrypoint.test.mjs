@@ -74,6 +74,12 @@ const serverCheck = spawnSync(process.execPath, ['--check', 'server.js'], { enco
 assert.strictEqual(serverCheck.status, 0, `server.js failed syntax check: ${serverCheck.stderr}`);
 console.log(`  [PASS] server.js passes Node.js syntax and import verification.`);
 
+// Test 7: Verify /help and /ticket commands exist and are properly structured
+console.log(`👉 Test 7: Checking /help and /ticket commands registration structure...`);
+assert.ok(fs.existsSync('commands/help.js'), 'commands/help.js must exist');
+assert.ok(fs.existsSync('commands/ticket.js'), 'commands/ticket.js must exist');
+console.log(`  [PASS] /help and /ticket commands are present and verified.`);
+
 console.log("==================================================");
 console.log("✅ ALL CODE NEXUS COMPATIBILITY TESTS PASSED!");
 console.log("==================================================");

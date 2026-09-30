@@ -10,6 +10,7 @@ import { canExecute } from '../utils/cmdGuard.js';
 export default {
   name: 'prefix',
   description: 'عرض أو تغيير بريفكس الأوامر لهذا السيرفر',
+  category: 'Administration',
   userPermissions: ['Administrator'],
   data: new SlashCommandBuilder()
     .setName('prefix')

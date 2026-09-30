@@ -5,7 +5,7 @@
  * Order of execution:
  * 1. Load environment (.env, /home/container/.env)
  * 2. Create Express app & register routes/static files
- * 3. Start HTTP server on 0.0.0.0:14713 & confirm listening
+ * 3. Start HTTP server on 0.0.0.0:20360 & confirm listening
  * 4. Initialize Discord bot client (isolated, non-blocking)
  * 5. Initialize MongoDB connection (isolated, non-blocking)
  */
@@ -34,9 +34,11 @@ process.on('unhandledRejection', (reason) => {
 
 // 3. Diagnostic Startup Logging
 const HOST = '0.0.0.0';
-const PORT = process.env.SERVER_PORT 
-  ? parseInt(process.env.SERVER_PORT, 10) 
-  : (process.env.PORT && process.env.PORT !== '8080' ? parseInt(process.env.PORT, 10) : 14713);
+const PORT = Number(
+  process.env.SERVER_PORT ||
+  (process.env.PORT && process.env.PORT !== '8080' ? process.env.PORT : null) ||
+  20360
+);
 
 console.log('[OneBot] =====================================');
 console.log('[OneBot] STARTUP');

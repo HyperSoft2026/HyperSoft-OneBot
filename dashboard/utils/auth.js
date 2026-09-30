@@ -9,7 +9,7 @@ import { guildDb } from '../../utils/guildDb.js';
 // Configuration
 export const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '1542313642060419213';
 export const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
-export const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://169.58.70.217:14713/api/auth/callback';
+export const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://51.83.6.7:20360/api/auth/callback';
 export const SESSION_SECRET = process.env.SESSION_SECRET || 'onebot_hypersoft_production_secret';
 
 // In-Memory Cryptographic OAuth State Store (TTL: 10 minutes)

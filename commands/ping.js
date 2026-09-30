@@ -8,6 +8,7 @@ import { SlashCommandBuilder } from 'discord.js';
 export default {
   name: 'ping',
   description: 'فحص سرعة استجابة وتأخير البوت',
+  category: 'General',
   data: new SlashCommandBuilder()
     .setName('ping')
     .setDescription('فحص سرعة استجابة وتأخير البوت'),

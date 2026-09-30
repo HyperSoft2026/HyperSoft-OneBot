@@ -1,6 +1,7 @@
 /**
  * OneBot by HyperSoft
  * Command: ticket
+ * Full Multi-Guild Support & Ticket Lifecycle Management
  */
 
 import { 
@@ -16,27 +17,47 @@ import { createTicket } from '../systems/tickets.js';
 
 export default {
   name: 'ticket',
-  description: 'إرسال لوحة التذاكر أو إنشاء تذكرة دعم فني',
-  userPermissions: ['Administrator'],
+  description: 'إدارة التذاكر، إرسال اللوحة التفاعلية، وإنشاء تذاكر الدعم',
+  category: 'Tickets',
   data: new SlashCommandBuilder()
     .setName('ticket')
-    .setDescription('إدارة التذاكر وإنشاء لوحة الدعم')
-    .addSubcommand(sub => 
-      sub.setName('panel')
-        .setDescription('إرسال لوحة فتح التذاكر التفاعلية في القناة الحالية')
-    )
+    .setDescription('إدارة التذاكر ونظام الدعم الفني')
     .addSubcommand(sub =>
       sub.setName('create')
-        .setDescription('إنشاء تذكرة دعم جديدة مباشرة')
+        .setDescription('إنشاء تذكرة دعم فني جديدة مباشرة')
+        .addStringOption(opt =>
+          opt.setName('category')
+            .setDescription('قسم التذكرة المطلوب')
+            .setRequired(false)
+        )
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    .addSubcommand(sub => 
+      sub.setName('panel')
+        .setDescription('إرسال لوحة فتح التذاكر التفاعلية في القناة الحالية (للإدارة فقط)')
+    )
+    .addSubcommand(sub =>
+      sub.setName('close')
+        .setDescription('إغلاق تذكرة الدعم الفني الحالية')
+        .addStringOption(opt =>
+          opt.setName('reason')
+            .setDescription('سبب إغلاق التذكرة')
+            .setRequired(false)
+        )
+    ),
 
   async execute(message, args) {
     if (!message.guild) return;
     const action = args[0]?.toLowerCase();
 
     if (action === 'panel') {
+      if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+        return message.reply("❌ هذا الخيار متاح فقط لإدارة السيرفر (Administrator).");
+      }
       return this.sendTicketPanel(message.channel, message.guild);
+    }
+
+    if (action === 'close') {
+      return this.closeTicketChannel(message.channel, message.member, message.guild, args.slice(1).join(' '));
     }
 
     // Default to create ticket
@@ -57,7 +78,7 @@ export default {
 
     if (sub === 'panel') {
       if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "أنت تفتقر إلى صلاحية Administrator.", ephemeral: true });
+        return interaction.reply({ content: "❌ أنت تفتقر إلى صلاحية Administrator لإرسال لوحة التذاكر.", ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });
@@ -67,12 +88,19 @@ export default {
 
     if (sub === 'create') {
       await interaction.deferReply({ ephemeral: true });
+      const categoryId = interaction.options.getString('category') || 'support';
       try {
-        const res = await createTicket(interaction.guild, interaction.user, 'support');
-        return interaction.editReply({ content: `✅ تم فتح التذكرة بنجاح: <#${res.channelId}>` });
+        const res = await createTicket(interaction.guild, interaction.user, categoryId);
+        return interaction.editReply({ content: `✅ تم فتح تذكرتك بنجاح: <#${res.channelId}>` });
       } catch (err) {
-        return interaction.editReply({ content: `❌ خطأ: ${err.message}` });
+        return interaction.editReply({ content: `❌ خطأ في فتح التذكرة: ${err.message}` });
       }
+    }
+
+    if (sub === 'close') {
+      await interaction.deferReply();
+      const reason = interaction.options.getString('reason') || 'تم حل المشكلة بواسطة العضو أو الإدارة';
+      return this.closeTicketInteraction(interaction, reason);
     }
   },
 
@@ -102,5 +130,73 @@ export default {
     });
 
     await channel.send({ embeds: [embed], components: [row] });
+  },
+
+  async closeTicketInteraction(interaction, reason) {
+    const channel = interaction.channel;
+    const guild = interaction.guild;
+    const member = interaction.member;
+
+    if (!channel?.name?.startsWith('ticket-')) {
+      return interaction.editReply({ content: "❌ هذا الأمر يُستخدم فقط داخل قنوات التذاكر (ticket-xxx)." });
+    }
+
+    const settings = await guildDb.get(guild.id);
+    const staffRoleId = settings.tickets?.categories?.[0]?.staffRoleId;
+    const isStaff = staffRoleId && member.roles.cache.has(staffRoleId);
+    const isAdmin = member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ManageChannels);
+    const isOwner = channel.topic?.includes(interaction.user.id);
+
+    if (!isAdmin && !isStaff && !isOwner) {
+      return interaction.editReply({ content: "❌ ليس لديك الصلاحية لإغلاق هذه التذكرة." });
+    }
+
+    const closeEmbed = new EmbedBuilder()
+      .setTitle("🔒 إغلاق التذكرة")
+      .setDescription(`تم إغلاق التذكرة بواسطة <@${interaction.user.id}>.\n**السبب:** ${reason}\nسيتم حذف القناة خلال 5 ثوانٍ.`)
+      .setColor("#E53935")
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [closeEmbed] });
+
+    setTimeout(async () => {
+      try {
+        if (channel.deletable) await channel.delete(`Ticket closed by ${interaction.user.tag}: ${reason}`);
+      } catch (e) {
+        console.error(`[Ticket Close Error in ${guild.id}]:`, e.message);
+      }
+    }, 5000);
+  },
+
+  async closeTicketChannel(channel, member, guild, reason = 'تم الإغلاق بواسطة العضو أو الإدارة') {
+    if (!channel?.name?.startsWith('ticket-')) {
+      return channel.send("❌ هذا الأمر يُستخدم فقط داخل قنوات التذاكر (ticket-xxx).");
+    }
+
+    const settings = await guildDb.get(guild.id);
+    const staffRoleId = settings.tickets?.categories?.[0]?.staffRoleId;
+    const isStaff = staffRoleId && member.roles.cache.has(staffRoleId);
+    const isAdmin = member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ManageChannels);
+    const isOwner = channel.topic?.includes(member.id);
+
+    if (!isAdmin && !isStaff && !isOwner) {
+      return channel.send("❌ ليس لديك الصلاحية لإغلاق هذه التذكرة.");
+    }
+
+    const closeEmbed = new EmbedBuilder()
+      .setTitle("🔒 إغلاق التذكرة")
+      .setDescription(`تم إغلاق التذكرة بواسطة <@${member.id}>.\n**السبب:** ${reason}\nسيتم حذف القناة خلال 5 ثوانٍ.`)
+      .setColor("#E53935")
+      .setTimestamp();
+
+    await channel.send({ embeds: [closeEmbed] });
+
+    setTimeout(async () => {
+      try {
+        if (channel.deletable) await channel.delete(`Ticket closed by ${member.user.tag}: ${reason}`);
+      } catch (e) {
+        console.error(`[Ticket Close Error in ${guild.id}]:`, e.message);
+      }
+    }, 5000);
   }
 };

@@ -30,7 +30,7 @@ export const LoginView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-mono text-gray-400">Cluster 0.0.0.0:14713</span>
+          <span className="text-xs font-mono text-gray-400">Cluster 0.0.0.0:20360</span>
         </div>
       </header>
 

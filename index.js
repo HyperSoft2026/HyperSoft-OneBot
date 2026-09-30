@@ -182,6 +182,14 @@ client.on('interactionCreate', async (interaction) => {
           return interaction.editReply({ content: `❌ خطأ في فتح التذكرة: ${err.message}` });
         }
       }
+
+      if (customId.startsWith('ticket_close')) {
+        const ticketCmd = client.commands.get('ticket');
+        if (ticketCmd?.closeTicketInteraction) {
+          await interaction.deferReply();
+          return ticketCmd.closeTicketInteraction(interaction, 'تم إغلاق التذكرة عبر الزر');
+        }
+      }
     }
   } catch (err) {
     console.error(`[interactionCreate Error in guild ${interaction.guildId}]:`, err.message);
